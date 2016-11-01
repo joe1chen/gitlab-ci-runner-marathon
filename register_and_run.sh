@@ -2,12 +2,6 @@
 
 set -eu
 
-# Ensure GITLAB_SERVICE_NAME (custom defined variable). We need this to discover the GitLab location
-if [ -z ${GITLAB_SERVICE_NAME+x} ]; then
-    echo "==> Need to set GITLAB_SERVICE_NAME to the service name of GitLab (e.g. gitlab.marathon.mesos)"
-    exit 1
-fi
-
 # Ensure REGISTRATION_TOKEN
 if [ -z ${REGISTRATION_TOKEN+x} ]; then
     echo "==> Need to set REGISTRATION_TOKEN. You can get this token in GitLab -> Admin Area -> Overview -> Runners"
@@ -55,13 +49,21 @@ fi
 
 # /Include the original entrypoint contents
 
-# Derive the Mesos DNS server ip address by getting the first nameserver entry from /etc/resolv.conf
-# Nasty workaround!
-export MESOS_DNS_SERVER=$(cat /etc/resolv.conf | grep nameserver | awk -F" " '{print $2}' | head -n 1)
+if [ -z ${CI_SERVER_URL+x} ]; then
+  # Ensure GITLAB_SERVICE_NAME (custom defined variable). We need this to discover the GitLab location
+  if [ -z ${GITLAB_SERVICE_NAME+x} ]; then
+      echo "==> Need to set GITLAB_SERVICE_NAME to the service name of GitLab (e.g. gitlab.marathon.mesos)"
+      exit 1
+  fi
 
-# Set the CI_SERVER_URL by resolving the Mesos DNS service name endpoint.
-# Environment variable GITLAB_SERVICE_NAME must be defined in the Marathon app.json
-export CI_SERVER_URL=http://$(mesosdns-resolver --serviceName $GITLAB_SERVICE_NAME --server $MESOS_DNS_SERVER --portIndex 0)/ci
+  # Derive the Mesos DNS server ip address by getting the first nameserver entry from /etc/resolv.conf
+  # Nasty workaround!
+  export MESOS_DNS_SERVER=$(cat /etc/resolv.conf | grep nameserver | awk -F" " '{print $2}' | head -n 1)
+
+  # Set the CI_SERVER_URL by resolving the Mesos DNS service name endpoint.
+  # Environment variable GITLAB_SERVICE_NAME must be defined in the Marathon app.json
+  export CI_SERVER_URL=http://$(mesosdns-resolver --serviceName $GITLAB_SERVICE_NAME --server $MESOS_DNS_SERVER --portIndex 0)/ci
+end
 
 # Derive the RUNNER_NAME from the MESOS_TASK_ID
 export RUNNER_NAME=${MESOS_TASK_ID}
